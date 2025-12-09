@@ -1,7 +1,11 @@
+// server.js - DersLig Projesi için Tam Arka Uç Sunucu Dosyası
+
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const axios = require('axios');
+const axios = require('axios'); // GitHub Auth için
+const connectDB = require('./db.config'); // YENİ: Veritabanı bağlantısı
+const courseRoutes = require('./routes/courseRoutes'); // YENİ: Ders API rotaları
 
 // .env dosyasındaki değişkenleri yükle
 dotenv.config(); 
@@ -9,19 +13,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Mobil uygulamanın erişimi için CORS ayarı
-app.use(cors()); 
-app.use(express.json());
-
+// GitHub OAuth Bilgileri (Buraya .env'den gelen bilgiler yüklenir)
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
-// --- 🚀 API Uç Noktası: GitHub ile Giriş ---
+// ----------------------------------------------------
+// ⚙️ MIDDLEWARE'LER
+// ----------------------------------------------------
+app.use(cors()); 
+app.use(express.json());
 
-/**
- * Endpoint: POST /api/auth/github
- * Amaç: GitHub yetkilendirme kodunu alıp, erişim jetonu ve kullanıcı bilgilerini döndürmek.
- */
+// ----------------------------------------------------
+// 🔗 VERİTABANI BAĞLANTISI
+// ----------------------------------------------------
+// Uygulama başlarken veritabanına bağlanır
+connectDB();
+
+// ----------------------------------------------------
+// 🔑 GITHUB AUTH KODU (Adım 1: Kullanıcı Girişi)
+// ----------------------------------------------------
+
 app.post('/api/auth/github', async (req, res) => {
     const { code } = req.body;
 
@@ -59,16 +70,12 @@ app.post('/api/auth/github', async (req, res) => {
         const githubUser = userResponse.data;
         
         // 3. Başarılı Yanıt ve Kullanıcı Bilgisi
-        console.log(`Giriş Başarılı: Kullanıcı ID - ${githubUser.id}, Kullanıcı Adı - ${githubUser.login}`);
-
         res.json({ 
             success: true, 
             message: 'Giriş başarılı',
-            // Gerçek projede bu bilgileri veritabanına kaydedip JWT token döndürmelisiniz.
             user: {
                 id: githubUser.id,
                 username: githubUser.login,
-                email: githubUser.email || 'GitHub e-postası gizli.', 
                 avatar_url: githubUser.avatar_url
             }
         });
@@ -79,7 +86,17 @@ app.post('/api/auth/github', async (req, res) => {
     }
 });
 
-// Sunucuyu başlat
+
+// ----------------------------------------------------
+// 🚀 DERS API ROTLARI (Adım 3: Ders İçeriği)
+// ----------------------------------------------------
+// /api/courses ile başlayan tüm istekler courseRoutes dosyasına yönlendirilir
+app.use('/api/courses', courseRoutes); 
+
+
+// ----------------------------------------------------
+// 🚦 SUNUCUYU BAŞLAT
+// ----------------------------------------------------
 app.listen(PORT, () => {
     console.log(`🚀 Arka Uç Sunucusu http://localhost:${PORT} adresinde çalışıyor...`);
 });
